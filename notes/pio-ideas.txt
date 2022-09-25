@@ -1,0 +1,43 @@
+State Machine 1:
+  Description: Divide clock to 44100Hz and trigger State Machine 2
+
+  Setup:
+    pio_sm_config pio_conf = pio_get_default_sm_config(); // Get default pio sm config
+    sm_config_set_clkdiv_int_frac(&pio_conf, 2816, 0);    // Set clock divider to 2816
+    sm_config_set_out_pins(&pio_conf, 0, 0);              // Clear OUT instruction pins
+   
+  Program:
+    .program ym2151_timer
+    .wrap_target
+      irq 0
+    .wrap
+    
+State Machine 2:
+  Description: Every rising edge of 44100Hz clock, write data to addr on YM2151
+
+  Setup:
+    pio_sm_config pio_conf = pio_get_default_sm_config(); // Get default pio sm config
+    sm_config_set_fifo_join(&pio_conf, PIO_FIFO_JOIN_TX); // Double TX FIFO size from 4 to 8 32-bit words
+    sm_config_set_out_pins(&pio_conf, 0, 8);              // Set GPIO 0-7 as pins for OUT instruction
+    sm_config_set_set_pins(&pio_conf, 7, 3);              // Set GPIO 8-10 as pins for SET instruction
+                                                          //      Used for A0, WR, and CS respectively
+
+  Program:
+    .program ym2151_write_data
+    .define cs_delay 1         ; Delay in clock cycles to keep CS low for
+      wait 1 irq 0
+      out x, 8                 ; Move addr to x register
+      jmp !x ym2151_write_data ; If addr = 0: it's a wait, jump back to start
+                               ; A0, WR, CS
+      set pins, 1              ; LO  LO  HI
+      mov pins, 8              ; write addr to data pins
+      set pins, 0 [cs_delay]   ; LO  LO  LO
+      set pins, 1              ; LO  LO  HI
+      set pins, 5              ; HI  LO  HI
+      out pins, 8              ; write data to data pins
+      set pins, 4 [cs_delay]   ; HI  LO  LO
+      set pins, 5              ; HI  LO  HI
+      set pins, 7              ; HI  HI  HI
+
+  Misc:
+    Check if the FIFO is full with pio_sm_is_tx_fifo_full(PIO pio, uint sm) before using pio_sm_put()

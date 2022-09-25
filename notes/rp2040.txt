@@ -1,0 +1,12 @@
+Clock division:
+	44.1kHz VGM sample rate
+
+	44.1kHz * 2816 = 124,185,600MHz
+
+	Input clock: 22.5792MHz
+	Output clock: 124.1856MHz
+		FBDIV: 66 (VCO = 1490.2272 MHz)
+		PD1: 6
+		PD2: 2
+	
+	Divide System clock freq by 2816 to get 44.1kHz

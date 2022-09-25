@@ -1,0 +1,28 @@
+YM2151:		OPM FM sound generator
+	D0-D7	Address/Data Bus (input/output)
+	A0	Address/Data Select (input)
+	_WR	Write (input)
+	_RD	Read (input)
+	_CS	Chip Select (input)
+	_IC	Initial clear (input)
+	_IRQ	Interrupt request (Output)
+	ϕM	System clock (input)
+	ϕ1	Clock for D/A (output)
+--- Needs 12 inputs from processor (uC) ---
+
+YM3012:		D/A Converter for YM2151
+	ϕ1	System clock (input)
+	SD	Serial data (input)
+	SAM2	If high, section becomes CH2 sampling period (input)
+	SAM1	If high, section becomes CH1 sampling period (input)
+	_ICL	Initial Clear (If low, analog output becomes equal (S2 = S1 = 0, S0 = 1), regardless of SD signal) (input)
+	SD	Serial data (input)
+--- Needs  1 input  from processor (uC) ---
+
+LTC6903:	SPI Programmable Oscillator
+	SDI	Serial Data Input (input)
+	SCK	Serial Port Clock (input)
+	_SEN	Serial Port Enable (Chip Select) (Input)
+	_CLK	Auxiliary Clock Output. Frequency set by serial port (output)
+	CLK	Main Clock Output. Frequency set by serial port (output)
+	OE	Asynchronous Output Enable. CLK and _CLK are set LOW when this pin is LOW. (input)

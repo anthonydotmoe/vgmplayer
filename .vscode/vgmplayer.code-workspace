@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"path": "../../pico-sdk"
+		}
+	],
+	"settings": {
+		"cortex-debug.variableUseNaturalFormat": false
+	}
+}
