@@ -49,5 +49,6 @@ Special thanks to:
 - [ReimuNotMoe](https://github.com/ReimuNotMoe) for their work on
   [TinyVGM](https://github.com/SudoMaker/TinyVGM). This framework for digesting
   the `.vgm` files is really helpful for me.
-- [Aidan Lawrence](https://github.com/AidanHockey5) for open-sourcing his YM2151
-  music player which got me started in the ATMEGA328P days.
+- [Aidan Lawrence](https://github.com/AidanHockey5) for open-sourcing his [YM2151
+  music player](https://github.com/AidanHockey5/YM2151_VGM_STM32) which got me
+  started in the ATMEGA328P days.
