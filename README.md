@@ -43,7 +43,7 @@ the chip from, a Yamaha CX5 Music Computer.
 ### Software
 
 
-*To be documented...*
+*To be documented... and written*
 
 ### Thank You
 
