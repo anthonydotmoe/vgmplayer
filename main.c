@@ -58,18 +58,18 @@ int main(){
 		.userp = &vgmcb_data
 	};
 	
-	ret = vgm_parse_header(&vgm_ctx);
+	ret = tinyvgm_parse_header(&vgm_ctx);
 	
-	printf("vgm_parse_header returned %d\n", ret);
+	printf("tinyvgm_parse_header returned %d\n", ret);
 	
 	if (ret == TinyVGM_OK) {
 		if(get_gd3_offset_abs()) {
-			ret = vgm_parse_metadata(&vgm_ctx, get_gd3_offset_abs());
-			printf("vgm_parse_metadata returned %d\n", ret);
+			ret = tinyvgm_parse_metadata(&vgm_ctx, get_gd3_offset_abs());
+			printf("tinyvgm_parse_metadata returned %d\n", ret);
 		}
 		if (get_data_offset_abs()) {
-			ret = vgm_parse_commands(&vgm_ctx, get_data_offset_abs());
-			printf("vgm_parse_commands returned %d\n", ret);
+			ret = tinyvgm_parse_commands(&vgm_ctx, get_data_offset_abs());
+			printf("tinyvgm_parse_commands returned %d\n", ret);
 		}
 	}
 

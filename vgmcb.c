@@ -21,11 +21,11 @@ int vgmcb_header(void *userp, TinyVGMHeaderField field, uint32_t value) {
             }
             break;
         case TinyVGM_HeaderField_Data_Offset:
-            set_data_offset_abs(value + vgm_headerfield_offset(field));
+            set_data_offset_abs(value + tinyvgm_headerfield_offset(field));
             printf("Data Offset: 0x%08" PRIx32 " (%" PRIu32 ")\n", get_data_offset_abs(), get_data_offset_abs());
             break;
         case TinyVGM_HeaderField_GD3_Offset:
-            set_gd3_offset_abs(value + vgm_headerfield_offset(field));
+            set_gd3_offset_abs(value + tinyvgm_headerfield_offset(field));
             printf("GD3 Offset: 0x%08" PRIx32 " (%" PRIu32 ")\n", get_gd3_offset_abs(), get_gd3_offset_abs());
             break;
         case TinyVGM_HeaderField_YM2151_Clock:
