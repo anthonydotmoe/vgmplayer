@@ -9,7 +9,10 @@ pico_sdk_init()
 add_executable(${PROJECT_NAME}
 	main.c
 	vgmcb.c
+	ltc6903.c
 )
+
+pico_generate_pio_header(${PROJECT_NAME} ${CMAKE_CURRENT_LIST_DIR}/ym2151.pio)
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/lib/TinyVGM)
 add_subdirectory(${CMAKE_SOURCE_DIR}/lib/no-OS-FatFS/FatFs_SPI)

@@ -1,0 +1,54 @@
+.program ym2151_timer
+
+; Raise PIO IRQ 0 every 44.1kHz after clock division
+
+.wrap_target
+  irq 0
+.wrap
+
+.program ym2151_write_data
+
+; Send byte dd to address aa
+
+.define cs_delay 1
+.wrap_target
+start:
+  wait 1 irq 0                ; wait for 44.1kHz clock
+  out x, 8                    ; move addr from osr to x register
+  jmp !x start                ; if addr == 0; it's a wait, jump back to beginning
+  set pins, 0b001             ; --, --, CS
+  mov pins, x                 ; write addr from x to data pins
+  set pins, 0b000 [cs_delay]  ; --, --, --
+  set pins, 0b001             ; --, --, CS
+  set pins, 0b101             ; A0, --, CS
+  out pins, 8                 ; write data from osr to data pins
+  set pins, 0b100 [cs_delay]  ; A0, --, --
+  set pins, 0b101             ; A0, --, CS
+  set pins, 0b111             ; A0, WR, CS
+.wrap
+
+% c-sdk {
+    static inline void init_ym2151_timer_program(PIO pio, uint sm, uint offset) {
+        pio_sm_config c = ym2151_timer_get_default_config(offset);
+        sm_config_set_clkdiv_int_frac(&c, 2816, 0);
+        pio_sm_init(pio, sm, offset, &c);
+        pio_sm_set_enabled(pio, sm, true);
+    }
+    
+    static inline void init_ym2151_write_data_program(PIO pio, uint sm, uint offset, uint data_base, uint ctrl_base) {
+        for(int i = data_base; i < 8; i++) {
+          pio_gpio_init(pio, i);
+        }
+        for(int i = ctrl_base; i < 3; i++) {
+          pio_gpio_init(pio, i);
+        }
+        pio_sm_set_consecutive_pindirs(pio, sm, data_base, 8, true);
+        pio_sm_set_consecutive_pindirs(pio, sm, ctrl_base, 3, true);
+        pio_sm_config c = ym2151_write_data_get_default_config(offset);
+        sm_config_set_out_shift(&c, true, true, 16);
+        sm_config_set_out_pins(&c, data_base, 8);
+        sm_config_set_set_pins(&c, ctrl_base, 3);
+        pio_sm_init(pio, sm, offset, &c);
+        pio_sm_set_enabled(pio, sm, true);
+    }
+%}
