@@ -35,7 +35,7 @@ I made this development board for the project.
 
 GPIO 0-7 are connected to D0-D7 on the YM2151. GPIO 8-10 are connected to the
 `A0`, `WR`, and `CS` pins. I'm using SPI to connect to the SD card, and an
-LTC6903 programmable clock generator, making the main clock for the YM2151.
+LTC6903 programmable clock generator making the main clock for the YM2151.
 
 The supporting circuitry for the YM2151 was ripped from the same place I got
 the chip from, a Yamaha CX5 Music Computer.
