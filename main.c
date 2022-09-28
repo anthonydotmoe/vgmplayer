@@ -3,7 +3,7 @@
 #include "sd_card.h"
 #include "ff.h"
 
-#include "lib/vgm/vgm.h"
+#include "lib/TinyVGM/TinyVGM.h"
 #include "vgmcb.h"
 
 FRESULT init_sd_card();
@@ -44,7 +44,7 @@ int main(){
 		.ym2151_clock = 0
 	};
 	
-	VGMContext vgm_ctx = {
+	TinyVGMContext vgm_ctx = {
 		.callback = {
 			.header = vgmcb_header,
 			.metadata = vgmcb_metadata,
@@ -62,7 +62,7 @@ int main(){
 	
 	printf("vgm_parse_header returned %d\n", ret);
 	
-	if (ret == VGM_OK) {
+	if (ret == TinyVGM_OK) {
 		if(get_gd3_offset_abs()) {
 			ret = vgm_parse_metadata(&vgm_ctx, get_gd3_offset_abs());
 			printf("vgm_parse_metadata returned %d\n", ret);
