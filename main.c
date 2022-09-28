@@ -4,6 +4,8 @@
 #include "ff.h"
 
 #include "lib/TinyVGM/TinyVGM.h"
+#include "lib/ltc6903/ltc6903.h"
+
 #include "vgmcb.h"
 
 FRESULT init_sd_card();
@@ -24,26 +26,37 @@ int main(){
 	char buf;
 	char *filename = "in.vgm";
 	
-	// Initialize the serial port
 	stdio_init_all();
 	
+	// Initialize SD card
 	fr = init_sd_card(&fs);
 	if(fr != FR_OK) {
 		die("Could not initialize the SD card");
 	}
 	
+	// Open file
 	fr = f_open(&fil, filename, FA_READ);
 	if(fr != FR_OK) {
 		printf("f_open returned: %d", fr);
 		die("Could not open file");
 	}
 	
+	// Set up LTC6903
+	ltc_handle ltc_h = {
+		.cs = 20,
+		.oe = 21,
+		.spi = spi0
+	};
+	ltc_initialize(&ltc_h);
+
+	// Set up user pointer
 	vgmcb_data_t vgmcb_data = {
 		.fil = &fil,
 		.state = VGMPLAYER_STOP,
-		.ym2151_clock = 0
+		.ltc_h = &ltc_h
 	};
 	
+	// Set up TinyVGM
 	TinyVGMContext vgm_ctx = {
 		.callback = {
 			.header = vgmcb_header,
@@ -72,6 +85,8 @@ int main(){
 			printf("tinyvgm_parse_commands returned %d\n", ret);
 		}
 	}
+	
+	ltc_set_freq(4000000);
 
 	//Loop forever 😢
 	f_close(&fil);

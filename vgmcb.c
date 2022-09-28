@@ -33,7 +33,10 @@ int vgmcb_header(void *userp, TinyVGMHeaderField field, uint32_t value) {
                 fprintf(stderr, "Can't continue. No YM2151 in the VGM\n");
                 return TinyVGM_EINVAL;
             }
-            ((vgmcb_data_t*)userp)->ym2151_clock = value;
+            sd_card_t *sd_card = sd_get_by_num(0);
+            sd_spi_acquire(sd_card);
+            ltc_set_freq(userp->ltc_h, value);
+            
             printf("Set the YM2151 clock to %d\n", value);
     }
     return TinyVGM_OK;

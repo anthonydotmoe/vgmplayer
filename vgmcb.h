@@ -1,8 +1,14 @@
 #pragma once
 
 #include <stdio.h>
+
 #include "lib/TinyVGM/TinyVGM.h"
+
 #include "ff.h"
+#include "hw_config.h"
+#include "sd_spi.h"
+
+#include "lib/ltc6903/ltc6903.h"
 
 // void set_data_offset_abs(const uint32_t o);
 
@@ -21,7 +27,7 @@ uint32_t get_gd3_offset_abs();
 typedef struct vgmcb_data_t {
 	FIL *fil;
 	uint state;
-	uint32_t ym2151_clock;
+	ltc_handle *ltc_h;
 } vgmcb_data_t;
 
 int vgmcb_header(void *userp, TinyVGMHeaderField field, uint32_t value);
