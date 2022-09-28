@@ -1,3 +1,0 @@
-[submodule "lib/no-OS-FatFS-SD-SPI-RPi-Pico"]
-	path = lib/no-OS-FatFS-SD-SPI-RPi-Pico
-	url = ../no-OS-FatFS-SD-SPI-RPi-Pico
