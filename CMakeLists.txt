@@ -11,7 +11,7 @@ add_executable(${PROJECT_NAME}
 	vgmcb.c
 )
 
-add_subdirectory(${CMAKE_SOURCE_DIR}/lib/vgm)
+add_subdirectory(${CMAKE_SOURCE_DIR}/lib/TinyVGM)
 add_subdirectory(${CMAKE_SOURCE_DIR}/lib/no-OS-FatFS/FatFs_SPI)
 
 pico_enable_stdio_usb(${PROJECT_NAME} 1)
@@ -21,6 +21,6 @@ pico_add_extra_outputs(${PROJECT_NAME})
 
 target_link_libraries(${PROJECT_NAME}
 	pico_stdlib
-	libvgm
+	TinyVGM
 	FatFs_SPI
 )

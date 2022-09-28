@@ -1,0 +1,6 @@
+[submodule "lib/no-OS-FatFS"]
+	path = lib/no-OS-FatFS
+	url = ../no-OS-FatFS-SD-SPI-RPi-Pico
+[submodule "lib/TinyVGM"]
+	path = lib/TinyVGM
+	url = ../TinyVGM.git
