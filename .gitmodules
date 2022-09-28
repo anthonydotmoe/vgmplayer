@@ -1,6 +1,0 @@
-[submodule "lib/no-OS-FatFS"]
-	path = lib/no-OS-FatFS
-	url = git@github.com:/anthonydotmoe/no-OS-FatFS-SD-SPI-RPi-Pico.git
-[submodule "lib/no-OS-FatFS-SD-SPI-RPi-Pico"]
-	path = lib/no-OS-FatFS-SD-SPI-RPi-Pico
-	url = git@github.com:/anthonydotmoe/no-OS-FatFS-SD-SPI-RPi-Pico.git
