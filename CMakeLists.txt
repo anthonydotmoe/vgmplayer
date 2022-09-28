@@ -12,7 +12,7 @@ add_executable(${PROJECT_NAME}
 )
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/lib/vgm)
-add_subdirectory(${CMAKE_SOURCE_DIR}/lib/no-OS-FatFS-SD-SPI-RPi-Pico/FatFs_SPI)
+add_subdirectory(${CMAKE_SOURCE_DIR}/lib/no-OS-FatFS/FatFs_SPI)
 
 pico_enable_stdio_usb(${PROJECT_NAME} 1)
 pico_enable_stdio_uart(${PROJECT_NAME} 0)
