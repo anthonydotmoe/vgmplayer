@@ -28,6 +28,18 @@ int main(){
 	
 	stdio_init_all();
 	
+	// wait one second
+	sleep_ms(1000);
+	
+	// Set up LTC6903
+	printf("Initializing LTC6903\n");
+	ltc_handle ltc_h = {
+		.cs = 20,
+		.oe = 21,
+		.spi = spi0
+	};
+	ltc_initialize(&ltc_h);
+	
 	// Initialize SD card
 	fr = init_sd_card(&fs);
 	if(fr != FR_OK) {
@@ -41,13 +53,6 @@ int main(){
 		die("Could not open file");
 	}
 	
-	// Set up LTC6903
-	ltc_handle ltc_h = {
-		.cs = 20,
-		.oe = 21,
-		.spi = spi0
-	};
-	ltc_initialize(&ltc_h);
 
 	// Set up user pointer
 	vgmcb_data_t vgmcb_data = {
@@ -85,8 +90,6 @@ int main(){
 			printf("tinyvgm_parse_commands returned %d\n", ret);
 		}
 	}
-	
-	ltc_set_freq(4000000);
 
 	//Loop forever 😢
 	f_close(&fil);

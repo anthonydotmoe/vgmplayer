@@ -8,6 +8,8 @@
 #include "hw_config.h"
 #include "sd_spi.h"
 
+#include "pico/sem.h"
+
 #include "lib/ltc6903/ltc6903.h"
 
 // void set_data_offset_abs(const uint32_t o);

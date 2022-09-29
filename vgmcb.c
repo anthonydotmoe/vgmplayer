@@ -34,9 +34,14 @@ int vgmcb_header(void *userp, TinyVGMHeaderField field, uint32_t value) {
                 return TinyVGM_EINVAL;
             }
             sd_card_t *sd_card = sd_get_by_num(0);
-            sd_spi_acquire(sd_card);
-            ltc_set_freq(userp->ltc_h, value);
-            
+
+            //dma_channel_wait_for_finish_blocking(sd_card->spi->tx_dma);
+            //dma_channel_wait_for_finish_blocking(sd_card->spi->rx_dma);
+            while(spi_is_busy(sd_card->spi->hw_inst));
+
+            ltc_set_freq(((vgmcb_data_t*)userp)->ltc_h, value);
+            //ltc_output_enable(((vgmcb_data_t*)userp)->ltc_h, true);
+
             printf("Set the YM2151 clock to %d\n", value);
     }
     return TinyVGM_OK;

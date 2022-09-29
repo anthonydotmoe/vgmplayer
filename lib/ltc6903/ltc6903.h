@@ -17,3 +17,4 @@ void ltc_uninitialize(ltc_handle *h);
 
 void ltc_set_freq(ltc_handle *h, const uint32_t freq);
 void ltc_output_enable(ltc_handle *h, bool enable);
+void ltc_low_power(ltc_handle *h, bool enable);
