@@ -7,6 +7,11 @@
 #include "lib/ltc6903/ltc6903.h"
 
 #include "vgmcb.h"
+#include "ym2151.pio.h"
+
+#define YM2151_DATA_BASE 0
+#define YM2151_CTRL_BASE 8
+#define YM2151_ICL_PIN   14
 
 FRESULT init_sd_card();
 void die(char *msg);
@@ -76,15 +81,41 @@ int main(){
 		.userp = &vgmcb_data
 	};
 	
+	// Parse header, get GD3 start, Data offset, determine if file can be played
 	ret = tinyvgm_parse_header(&vgm_ctx);
 	
 	printf("tinyvgm_parse_header returned %d\n", ret);
 	
 	if (ret == TinyVGM_OK) {
+		// Print Metadata
 		if(get_gd3_offset_abs()) {
 			ret = tinyvgm_parse_metadata(&vgm_ctx, get_gd3_offset_abs());
 			printf("tinyvgm_parse_metadata returned %d\n", ret);
 		}
+
+		//// Before playing the tune, set up the YM2151
+		// Set up ICL gpio
+		gpio_init(YM2151_ICL_PIN);
+		gpio_set_dir(YM2151_ICL_PIN, GPIO_OUT);
+		gpio_put(YM2151_ICL_PIN, 0); // Initial clear with low
+		sleep_ms(100);
+		gpio_put(YM2151_ICL_PIN, 1); // Set back to high
+		// Set up PIO SMs
+		PIO pio = pio0;
+		// Initialize the timer program
+		uint pio_timer_program_offset = pio_add_program(pio, &ym2151_timer_program);
+		uint pio_timer_program_sm = pio_claim_unused_sm(pio, true);
+		init_ym2151_timer_program(pio, pio_timer_program_sm, pio_timer_program_offset);
+		// Initialize the data program
+		uint pio_data_program_offset = pio_add_program(pio, &ym2151_write_data_program);
+		uint pio_data_program_sm = pio_claim_unused_sm(pio, true);
+		init_ym2151_write_data_program(pio, pio_data_program_sm, pio_data_program_offset, 0, 8);
+		
+		// Share this data with the callback
+		vgmcb_data.ym2151_data_pio = pio;
+		vgmcb_data.ym2151_data_sm = pio_data_program_sm;
+		
+		// Play the tune
 		if (get_data_offset_abs()) {
 			ret = tinyvgm_parse_commands(&vgm_ctx, get_data_offset_abs());
 			printf("tinyvgm_parse_commands returned %d\n", ret);

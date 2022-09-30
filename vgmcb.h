@@ -2,13 +2,15 @@
 
 #include <stdio.h>
 
-#include "lib/TinyVGM/TinyVGM.h"
-
 #include "ff.h"
 #include "hw_config.h"
 #include "sd_spi.h"
-
 #include "pico/sem.h"
+
+#include "hardware/pio.h"
+#include "ym2151.pio.h"
+
+#include "lib/TinyVGM/TinyVGM.h"
 
 #include "lib/ltc6903/ltc6903.h"
 
@@ -30,6 +32,8 @@ typedef struct vgmcb_data_t {
 	FIL *fil;
 	uint state;
 	ltc_handle *ltc_h;
+	PIO ym2151_data_pio; // ym2151_write_data PIO inst
+	uint ym2151_data_sm; // ym2151_write_data state machine
 } vgmcb_data_t;
 
 int vgmcb_header(void *userp, TinyVGMHeaderField field, uint32_t value);

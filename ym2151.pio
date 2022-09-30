@@ -3,49 +3,71 @@
 ; Raise PIO IRQ 0 every 44.1kHz after clock division
 
 .wrap_target
-  irq 0
+  irq wait 4
 .wrap
 
 .program ym2151_write_data
 
 ; Send byte dd to address aa
 
-.define cs_delay 1
+; Recieves a 32-bit command in the form of:
+; cc cc dd dd, where cc cc is the op code, and dd dd are the operands. 
+;
+; Op codes
+;   If 0:
+;     operands aa dd where aa is the 8 bit address and dd is 8 bit data to send.
+;   If !0:
+;     spin for nn nn cycles, where nn nn is the 16 bits after the control value
+
+; each clock is about 8 ns
+  set pins, 0b001 ; start with CS/WR high
 .wrap_target
 start:
-  wait 1 irq 0                ; wait for 44.1kHz clock
-  out x, 8                    ; move addr from osr to x register
-  jmp !x start                ; if addr == 0; it's a wait, jump back to beginning
-  set pins, 0b001             ; --, --, CS
-  mov pins, x                 ; write addr from x to data pins
-  set pins, 0b000 [cs_delay]  ; --, --, --
-  set pins, 0b001             ; --, --, CS
-  set pins, 0b101             ; A0, --, CS
-  out pins, 8                 ; write data from osr to data pins
-  set pins, 0b100 [cs_delay]  ; A0, --, --
-  set pins, 0b101             ; A0, --, CS
-  set pins, 0b111             ; A0, WR, CS
+  pull
+  wait 1 irq 4                ; wait for 44.1kHz clock
+  out x, 16                   ; move opcode from osr to x register
+  jmp !x send                 ; opcode 0, send data
+  out x, 16                   ; move wait cycle count to x
+wait_loop:
+  wait 1 irq 4                ; wait for next 44.1kHz clock
+  jmp x-- wait_loop           ; jump back to wait if x-- != 0
+  jmp start                   ; jump back to start if x == 0
+send:
+;                        A0, WR, CS
+  set pins, 0b000 [3]  ; --, --, --
+  out pins, 8     [9]  ;
+  set pins, 0b001 [3]  ; --, --, CS
+  set pins, 0b101 [3]  ; A0, --, CS
+  set pins, 0b100 [3]  ; A0, --, --
+  out pins, 8     [9]  ;
+  set pins, 0b101 [3]  ; A0, --, CS
+  set pins, 0b001      ; --, --, CS
+  nop [31]
 .wrap
 
 % c-sdk {
+    #include "hardware/clocks.h"
     static inline void init_ym2151_timer_program(PIO pio, uint sm, uint offset) {
-        pio_sm_config c = ym2151_timer_get_default_config(offset);
-        sm_config_set_clkdiv_int_frac(&c, 2816, 0);
+        pio_sm_config c = ym2151_timer_program_get_default_config(offset);
+        printf("current clock speed: %d\n", clock_get_hz(clk_sys));
+        sm_config_set_clkdiv(&c, 2816.0f);
         pio_sm_init(pio, sm, offset, &c);
         pio_sm_set_enabled(pio, sm, true);
     }
     
     static inline void init_ym2151_write_data_program(PIO pio, uint sm, uint offset, uint data_base, uint ctrl_base) {
-        for(int i = data_base; i < 8; i++) {
+        for(int i = data_base; i < data_base + 8; i++) {
           pio_gpio_init(pio, i);
         }
-        for(int i = ctrl_base; i < 3; i++) {
+        for(int i = ctrl_base; i < ctrl_base + 3; i++) {
           pio_gpio_init(pio, i);
         }
         pio_sm_set_consecutive_pindirs(pio, sm, data_base, 8, true);
         pio_sm_set_consecutive_pindirs(pio, sm, ctrl_base, 3, true);
-        pio_sm_config c = ym2151_write_data_get_default_config(offset);
-        sm_config_set_out_shift(&c, true, true, 16);
+        pio_sm_config c = ym2151_write_data_program_get_default_config(offset);
+        sm_config_set_clkdiv_int_frac(&c, 3, 0);
+        sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
+        sm_config_set_out_shift(&c, false, false, 32);
         sm_config_set_out_pins(&c, data_base, 8);
         sm_config_set_set_pins(&c, ctrl_base, 3);
         pio_sm_init(pio, sm, offset, &c);
