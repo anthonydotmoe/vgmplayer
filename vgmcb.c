@@ -119,7 +119,9 @@ int vgmcb_command(void *userp, unsigned int cmd, const void *buf, uint32_t len) 
         printf("FIFO: %02d el\n", tx_fifo_el);
     switch(cmd) {
     case 0x54: // YM2151 data write: 54 aa dd: write value dd to register aa
-        pio_data = *(uint16_t*)buf;
+        uint8_t addr = ((uint8_t*)buf)[0];
+        uint8_t data = ((uint8_t*)buf)[1];
+        pio_data = 0u | (((uint16_t)addr) << 8) | data;
         pio_sm_put_blocking(pio, sm, pio_data);
         print_command(cmd, pio_data);
         break;

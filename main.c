@@ -97,6 +97,8 @@ int main(){
 		// Set up ICL gpio
 		gpio_init(YM2151_ICL_PIN);
 		gpio_set_dir(YM2151_ICL_PIN, GPIO_OUT);
+		gpio_put(YM2151_ICL_PIN, 1);
+		sleep_ms(100);
 		gpio_put(YM2151_ICL_PIN, 0); // Initial clear with low
 		sleep_ms(100);
 		gpio_put(YM2151_ICL_PIN, 1); // Set back to high
