@@ -3,7 +3,7 @@
 ; Raise PIO IRQ 0 every 44.1kHz after clock division
 
 .wrap_target
-  irq wait 4
+  irq 4
 .wrap
 
 .program ym2151_write_data
@@ -19,7 +19,6 @@
 ;   If !0:
 ;     spin for nn nn cycles, where nn nn is the 16 bits after the control value
 
-; each clock is about 8 ns
   set pins, 0b001 ; start with CS/WR high
 .wrap_target
 start:
@@ -53,7 +52,7 @@ send:
     static inline void init_ym2151_timer_program(PIO pio, uint sm, uint offset) {
         pio_sm_config c = ym2151_timer_program_get_default_config(offset);
         printf("current clock speed: %d\n", clock_get_hz(clk_sys));
-        sm_config_set_clkdiv(&c, 2816.0f);
+        sm_config_set_clkdiv(&c, 2834.47f);
         pio_sm_init(pio, sm, offset, &c);
         pio_sm_set_enabled(pio, sm, true);
     }
