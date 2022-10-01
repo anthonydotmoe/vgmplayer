@@ -36,10 +36,13 @@ send:
 ;                        A0, WR, CS
   set pins, 0b000 [3]  ; --, --, --
   out pins, 8     [9]  ;
+  nop [31]
   set pins, 0b001 [3]  ; --, --, CS
   set pins, 0b101 [3]  ; A0, --, CS
+  nop [31]
   set pins, 0b100 [3]  ; A0, --, --
   out pins, 8     [9]  ;
+  nop [31]
   set pins, 0b101 [3]  ; A0, --, CS
   set pins, 0b001      ; --, --, CS
   nop [31]
@@ -65,7 +68,7 @@ send:
         pio_sm_set_consecutive_pindirs(pio, sm, data_base, 8, true);
         pio_sm_set_consecutive_pindirs(pio, sm, ctrl_base, 3, true);
         pio_sm_config c = ym2151_write_data_program_get_default_config(offset);
-        sm_config_set_clkdiv_int_frac(&c, 3, 0);
+        sm_config_set_clkdiv_int_frac(&c, 4, 0);
         sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
         sm_config_set_out_shift(&c, false, false, 32);
         sm_config_set_out_pins(&c, data_base, 8);
