@@ -28,6 +28,11 @@ uint32_t get_data_offset_abs();
 /// @return Absolute offset to GD3 data
 uint32_t get_gd3_offset_abs();
 
+/// @brief Returns the absolute offset to the loop point after it has been set
+///        by vgm_parse_header()
+/// @return Absolute offset to loop point
+uint32_t get_loop_offset_abs();
+
 typedef struct vgmcb_data_t {
 	FIL *fil;
 	uint state;

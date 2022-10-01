@@ -4,6 +4,10 @@ static uint32_t data_offset_abs = 0;
 void set_data_offset_abs(const uint32_t o) {data_offset_abs = o;}
 uint32_t get_data_offset_abs() {return data_offset_abs;}
 
+static uint32_t loop_offset_abs = 0;
+void set_loop_offset_abs(const uint32_t o) {loop_offset_abs = o;}
+uint32_t get_loop_offset_abs() {return loop_offset_abs;}
+
 static uint32_t gd3_offset_abs = 0;
 void set_gd3_offset_abs(const uint32_t o) {gd3_offset_abs = o;}
 uint32_t get_gd3_offset_abs() {return gd3_offset_abs;}
@@ -28,6 +32,9 @@ int vgmcb_header(void *userp, TinyVGMHeaderField field, uint32_t value) {
             set_gd3_offset_abs(value + tinyvgm_headerfield_offset(field));
             printf("GD3 Offset: 0x%08" PRIx32 " (%" PRIu32 ")\n", get_gd3_offset_abs(), get_gd3_offset_abs());
             break;
+        case TinyVGM_HeaderField_Loop_Offset:
+            set_loop_offset_abs(value + tinyvgm_headerfield_offset(field));
+            printf("Loop Offset: 0x%08" PRIx32 " (%" PRIu32 ")\n", get_loop_offset_abs(), get_loop_offset_abs());
         case TinyVGM_HeaderField_YM2151_Clock:
             if(!value) {
                 fprintf(stderr, "Can't continue. No YM2151 in the VGM\n");
@@ -105,40 +112,29 @@ int vgmcb_datablock(void *userp, unsigned int type, uint32_t file_offset, uint32
     return TinyVGM_OK;
 }
 
-static inline void print_command(unsigned int cmd, uint32_t pio_data) {
-    //printf("cmd: %02x, pio_data: %08x\n", cmd, pio_data);
-}
-
 int vgmcb_command(void *userp, unsigned int cmd, const void *buf, uint32_t len) {
     PIO pio = ((vgmcb_data_t*)userp)->ym2151_data_pio;
     uint sm = ((vgmcb_data_t*)userp)->ym2151_data_sm;
     uint32_t pio_data;
     
-    uint tx_fifo_el = pio_sm_get_tx_fifo_level(pio, sm);
-    if(tx_fifo_el < 2)
-        printf("FIFO: %02d el\n", tx_fifo_el);
     switch(cmd) {
     case 0x54: // YM2151 data write: 54 aa dd: write value dd to register aa
         uint8_t addr = ((uint8_t*)buf)[0];
         uint8_t data = ((uint8_t*)buf)[1];
         pio_data = 0u | (((uint16_t)addr) << 8) | data;
         pio_sm_put_blocking(pio, sm, pio_data);
-        print_command(cmd, pio_data);
         break;
     case 0x61: // Wait n samples: 61 nn nn
         pio_data = 0xffff0000 | *((uint16_t*)buf);
         pio_sm_put_blocking(pio, sm, pio_data);
-        print_command(cmd, pio_data);
         break;
     case 0x62: // Wait 735 samples (1/60 second)
         pio_data = 0xffff0000 | 735;
         pio_sm_put_blocking(pio, sm, pio_data);
-        print_command(cmd, pio_data);
         break;
     case 0x63: // Wait 882 samples (1/50 second)
         pio_data = 0xffff0000 | 882;
         pio_sm_put_blocking(pio, sm, pio_data);
-        print_command(cmd, pio_data);
         break;
     case 0x66: // End of sound data
         return -1;
@@ -160,7 +156,6 @@ int vgmcb_command(void *userp, unsigned int cmd, const void *buf, uint32_t len) 
     case 0x7f:
         pio_data = 0xffff0000 | ((cmd & 0x0f) + 1);
         pio_sm_put_blocking(pio, sm, pio_data);
-        print_command(cmd, pio_data);
         break;
     default:
         printf("Unhandled command\ncmd: 0x%02x, len: %" PRIu32 ", data: ", cmd, len);

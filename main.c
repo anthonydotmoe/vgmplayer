@@ -120,7 +120,11 @@ int main(){
 		// Play the tune
 		if (get_data_offset_abs()) {
 			ret = tinyvgm_parse_commands(&vgm_ctx, get_data_offset_abs());
+			while(!ret) {
+				ret = tinyvgm_parse_commands(&vgm_ctx, get_loop_offset_abs());
+			}
 			printf("tinyvgm_parse_commands returned %d\n", ret);
+			
 		}
 	}
 
