@@ -2,8 +2,6 @@
 
 "It's a work in progress"
 
-~Also bear with me 'cause I don't know git that well yet~
-
 ### Backstory
 
 **2018**
