@@ -3,26 +3,14 @@
 ; Raise PIO IRQ 0 every 44.1kHz after clock division
 
 .wrap_target
-  irq 4
+  irq wait 4
 .wrap
 
 .program ym2151_write_data
 
 /* TODO:
-+------------------------------------------------------------------------------+
-| ValleyBell says...                                                           |
-| In general, VGM timing assumed that the action of "sending a command" takes  |
-| 0 time. Only "wait" commands cause the time to advance. You need to be aware |
-| of that concept.                                                             |
-| Thus, when sending a command takes some real time, you need to subtract that |
-| time from the next delay. When I write timing code, I usually have a         |
-| timestamp for "time of the next command", which is increased whenever there  |
-| is a "wait" command. And when I'm sleeping, I always wait until that         |
-| timestamp is reached. (If the real time is already past it, then of course   |
-| there is no wait.)                                                           |
-+------------------------------------------------------------------------------+
  This implementation was founded on the idea that sending a command takes one
- sample. Need to rewrite so timing is like above.
+ sample. See note in /notes/vgm-timing.md
 */
 
 ; Send byte dd to address aa
@@ -36,11 +24,11 @@
 ;   If !0:
 ;     spin for nn nn cycles, where nn nn is the 16 bits after the control value
 
-  set pins, 0b001 ; start with CS/WR high
+  set pins, 0b001 ; start with CS high
 .wrap_target
 start:
   pull
-;  wait 1 irq 4                ; wait for 44.1kHz clock
+  wait 1 irq 4                ; wait for 44.1kHz clock
   out x, 16                   ; move opcode from osr to x register
   jmp !x send                 ; opcode 0, send data
   out x, 16                   ; move wait cycle count to x
@@ -50,29 +38,21 @@ wait_loop:
   jmp start                   ; jump back to start if x == 0
 send:
 ;                        A0, WR, CS
-  set pins, 0b000 [3]  ; --, --, --
-  out pins, 8     [9]  ;
-  nop [31]
-  set pins, 0b001 [3]  ; --, --, CS
-  set pins, 0b101 [3]  ; A0, --, CS
-  nop [31]
-  set pins, 0b100 [3]  ; A0, --, --
-  out pins, 8     [9]  ;
-  nop [31]
-  set pins, 0b101 [3]  ; A0, --, CS
+  set pins, 0b000      ; --, --, --
+  out pins, 8     [4]  ;
+  set pins, 0b001 [4]  ; --, --, CS
+  set pins, 0b101 [6] ; A0, --, CS
+  set pins, 0b100      ; A0, --, --
+  out pins, 8     [4]  ;
+  set pins, 0b101 [4]  ; A0, --, CS
   set pins, 0b001      ; --, --, CS
+  /*
+  nop [30]
   nop [31]
   nop [31]
   nop [31]
   nop [31]
-  nop [31]
-  nop [31]
-  nop [31]
-  nop [31]
-  nop [31]
-  nop [31]
-  nop [31]
-  nop [31]
+  */
 .wrap
 
 % c-sdk {
@@ -95,7 +75,7 @@ send:
         pio_sm_set_consecutive_pindirs(pio, sm, data_base, 8, true);
         pio_sm_set_consecutive_pindirs(pio, sm, ctrl_base, 3, true);
         pio_sm_config c = ym2151_write_data_program_get_default_config(offset);
-        sm_config_set_clkdiv_int_frac(&c, 8, 0);
+        sm_config_set_clkdiv_int_frac(&c, 10, 0);
         sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
         sm_config_set_out_shift(&c, false, false, 32);
         sm_config_set_out_pins(&c, data_base, 8);
