@@ -36,6 +36,10 @@ int vgmcb_header(void *userp, TinyVGMHeaderField field, uint32_t value) {
             set_gd3_offset_abs(value + tinyvgm_headerfield_offset(field));
             printf("GD3 Offset: 0x%08" PRIx32 " (%" PRIu32 ")\n", get_gd3_offset_abs(), get_gd3_offset_abs());
             break;
+        case TinyVGM_HeaderField_Total_Samples:
+            uint dur_seconds = 1.0f / 44100 * value;
+            printf("Duration: %02d:%02d\n", dur_seconds / 60, dur_seconds % 60);
+            break;
         case TinyVGM_HeaderField_Loop_Offset:
             set_loop_offset_abs(value + tinyvgm_headerfield_offset(field));
             printf("Loop Offset: 0x%08" PRIx32 " (%" PRIu32 ")\n", get_loop_offset_abs(), get_loop_offset_abs());
@@ -138,8 +142,6 @@ int vgmcb_command(void *userp, unsigned int cmd, const void *buf, uint32_t len) 
         pio_data = 0xffff0000 | 882;
         pio_sm_put_blocking(pio, sm, pio_data);
         break;
-    case 0x66: // End of sound data
-        return -1;
     case 0x70:
     case 0x71:
     case 0x72:
