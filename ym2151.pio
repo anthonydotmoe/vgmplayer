@@ -8,6 +8,23 @@
 
 .program ym2151_write_data
 
+/* TODO:
++------------------------------------------------------------------------------+
+| ValleyBell says...                                                           |
+| In general, VGM timing assumed that the action of "sending a command" takes  |
+| 0 time. Only "wait" commands cause the time to advance. You need to be aware |
+| of that concept.                                                             |
+| Thus, when sending a command takes some real time, you need to subtract that |
+| time from the next delay. When I write timing code, I usually have a         |
+| timestamp for "time of the next command", which is increased whenever there  |
+| is a "wait" command. And when I'm sleeping, I always wait until that         |
+| timestamp is reached. (If the real time is already past it, then of course   |
+| there is no wait.)                                                           |
++------------------------------------------------------------------------------+
+ This implementation was founded on the idea that sending a command takes one
+ sample. Need to rewrite so timing is like above.
+*/
+
 ; Send byte dd to address aa
 
 ; Recieves a 32-bit command in the form of:
@@ -23,7 +40,7 @@
 .wrap_target
 start:
   pull
-  wait 1 irq 4                ; wait for 44.1kHz clock
+;  wait 1 irq 4                ; wait for 44.1kHz clock
   out x, 16                   ; move opcode from osr to x register
   jmp !x send                 ; opcode 0, send data
   out x, 16                   ; move wait cycle count to x
@@ -44,6 +61,17 @@ send:
   nop [31]
   set pins, 0b101 [3]  ; A0, --, CS
   set pins, 0b001      ; --, --, CS
+  nop [31]
+  nop [31]
+  nop [31]
+  nop [31]
+  nop [31]
+  nop [31]
+  nop [31]
+  nop [31]
+  nop [31]
+  nop [31]
+  nop [31]
   nop [31]
 .wrap
 
@@ -67,7 +95,7 @@ send:
         pio_sm_set_consecutive_pindirs(pio, sm, data_base, 8, true);
         pio_sm_set_consecutive_pindirs(pio, sm, ctrl_base, 3, true);
         pio_sm_config c = ym2151_write_data_program_get_default_config(offset);
-        sm_config_set_clkdiv_int_frac(&c, 4, 0);
+        sm_config_set_clkdiv_int_frac(&c, 8, 0);
         sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
         sm_config_set_out_shift(&c, false, false, 32);
         sm_config_set_out_pins(&c, data_base, 8);

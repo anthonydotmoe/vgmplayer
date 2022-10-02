@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdarg.h>
 #include "pico/stdlib.h"
 #include "sd_card.h"
 #include "ff.h"
@@ -14,7 +15,7 @@
 #define YM2151_ICL_PIN   14
 
 FRESULT init_sd_card();
-void die(char *msg);
+void __attribute((noreturn)) die(const char *fmt, ...);
 
 typedef enum {
 	VGMPLAYER_PLAY,
@@ -26,15 +27,19 @@ typedef enum {
 int main(){
 	FRESULT fr;
 	FATFS fs;
+	DIR root_dir;
+	FILINFO filinfo;
 	FIL fil;
+
 	int ret;
 	char buf;
-	char *filename = "in.vgm";
 	
 	stdio_init_all();
 	
-	// wait one second
-	sleep_ms(1000);
+	sleep_ms(500);
+	gpio_init(YM2151_ICL_PIN);
+	gpio_set_dir(YM2151_ICL_PIN, GPIO_OUT);
+	gpio_put(YM2151_ICL_PIN, 1);
 	
 	// Set up LTC6903
 	printf("Initializing LTC6903\n");
@@ -44,20 +49,6 @@ int main(){
 		.spi = spi0
 	};
 	ltc_initialize(&ltc_h);
-	
-	// Initialize SD card
-	fr = init_sd_card(&fs);
-	if(fr != FR_OK) {
-		die("Could not initialize the SD card");
-	}
-	
-	// Open file
-	fr = f_open(&fil, filename, FA_READ);
-	if(fr != FR_OK) {
-		printf("f_open returned: %d", fr);
-		die("Could not open file");
-	}
-	
 
 	// Set up user pointer
 	vgmcb_data_t vgmcb_data = {
@@ -80,60 +71,86 @@ int main(){
 		
 		.userp = &vgmcb_data
 	};
-	
-	// Parse header, get GD3 start, Data offset, determine if file can be played
-	ret = tinyvgm_parse_header(&vgm_ctx);
-	
-	printf("tinyvgm_parse_header returned %d\n", ret);
-	
-	if (ret == TinyVGM_OK) {
-		// Print Metadata
-		if(get_gd3_offset_abs()) {
-			ret = tinyvgm_parse_metadata(&vgm_ctx, get_gd3_offset_abs());
-			printf("tinyvgm_parse_metadata returned %d\n", ret);
+
+	// Set up PIO SMs
+	PIO pio = pio0;
+	// Initialize the timer program
+	uint pio_timer_program_offset = pio_add_program(pio, &ym2151_timer_program);
+	uint pio_timer_program_sm = pio_claim_unused_sm(pio, true);
+	init_ym2151_timer_program(pio, pio_timer_program_sm, pio_timer_program_offset);
+	// Initialize the data program
+	uint pio_data_program_offset = pio_add_program(pio, &ym2151_write_data_program);
+	uint pio_data_program_sm = pio_claim_unused_sm(pio, true);
+	init_ym2151_write_data_program(pio, pio_data_program_sm, pio_data_program_offset, 0, 8);
+
+	// Share this data with the callback
+	vgmcb_data.ym2151_data_pio = pio;
+	vgmcb_data.ym2151_data_sm = pio_data_program_sm;
+
+	// Initialize SD card
+	fr = init_sd_card(&fs);
+	if(fr != FR_OK) {
+		die("Could not initialize the SD card");
+	}
+
+	fr = f_findfirst(&root_dir, &filinfo, "/", "*.vgm");
+	if(fr != FR_OK) {
+		die("searching for *.vgm, FatFS returned %d", fr);
+	}
+
+	while (*filinfo.fname) {
+		// Open file
+		fr = f_open(&fil, filinfo.fname, FA_READ);
+		if (fr != FR_OK)
+		{
+			die("Could not open \"%s\", f_open returned %d", filinfo.fname, fr);
 		}
 
-		//// Before playing the tune, set up the YM2151
-		// Set up ICL gpio
-		gpio_init(YM2151_ICL_PIN);
-		gpio_set_dir(YM2151_ICL_PIN, GPIO_OUT);
-		gpio_put(YM2151_ICL_PIN, 1);
-		sleep_ms(100);
-		gpio_put(YM2151_ICL_PIN, 0); // Initial clear with low
-		sleep_ms(100);
-		gpio_put(YM2151_ICL_PIN, 1); // Set back to high
-		// Set up PIO SMs
-		PIO pio = pio0;
-		// Initialize the timer program
-		uint pio_timer_program_offset = pio_add_program(pio, &ym2151_timer_program);
-		uint pio_timer_program_sm = pio_claim_unused_sm(pio, true);
-		init_ym2151_timer_program(pio, pio_timer_program_sm, pio_timer_program_offset);
-		// Initialize the data program
-		uint pio_data_program_offset = pio_add_program(pio, &ym2151_write_data_program);
-		uint pio_data_program_sm = pio_claim_unused_sm(pio, true);
-		init_ym2151_write_data_program(pio, pio_data_program_sm, pio_data_program_offset, 0, 8);
-		
-		// Share this data with the callback
-		vgmcb_data.ym2151_data_pio = pio;
-		vgmcb_data.ym2151_data_sm = pio_data_program_sm;
-		
-		// Play the tune
-		if (get_data_offset_abs()) {
-			ret = tinyvgm_parse_commands(&vgm_ctx, get_data_offset_abs());
-			while(!ret) {
-				ret = tinyvgm_parse_commands(&vgm_ctx, get_loop_offset_abs());
+		// Parse header, get GD3 start, Data offset, determine if file can be played
+		ret = tinyvgm_parse_header(&vgm_ctx);
+
+		printf("tinyvgm_parse_header returned %d\n", ret);
+
+		if (ret == TinyVGM_OK)
+		{
+			// Print Metadata
+			if (get_gd3_offset_abs())
+			{
+				ret = tinyvgm_parse_metadata(&vgm_ctx, get_gd3_offset_abs());
+				printf("tinyvgm_parse_metadata returned %d\n", ret);
 			}
-			printf("tinyvgm_parse_commands returned %d\n", ret);
 			
+			// Play the tune
+			if (get_data_offset_abs())
+			{
+				uint loop_count = 0;
+				pio_sm_set_enabled(pio, pio_timer_program_sm, false);
+				pio_sm_clear_fifos(pio, pio_data_program_sm);
+				pio_sm_restart(pio, pio_data_program_sm);
+				pio_sm_set_enabled(pio, pio_timer_program_sm, true);
+
+				gpio_put(YM2151_ICL_PIN, 0); // Initial clear with low
+				sleep_ms(1000);
+				gpio_put(YM2151_ICL_PIN, 1); // Set back to high
+				sleep_ms(1000);
+				ret = tinyvgm_parse_commands(&vgm_ctx, get_data_offset_abs());
+				/*
+				while (!ret && loop_count < 1) {
+					ret = tinyvgm_parse_commands(&vgm_ctx, get_loop_offset_abs());
+					loop_count++;
+				}
+				*/
+				printf("tinyvgm_parse_commands returned %d\n", ret);
+			}
+			printf("Playback finished\n");
 		}
+		sleep_ms(100);
+		f_close(&fil);
+		f_findnext(&root_dir, &filinfo);
 	}
 
-	//Loop forever 😢
-	f_close(&fil);
 	f_unmount("0:");
-	while(true) {
-		sleep_ms(1000);
-	}
+	die("Out of vgm files");
 }
 
 FRESULT init_sd_card(FATFS *fs) {
@@ -150,8 +167,14 @@ FRESULT init_sd_card(FATFS *fs) {
 	return FR_OK;
 }
 
-void die(char *msg) {
-	printf("ERROR: %s\n", msg);
+void __attribute((noreturn)) die(const char *fmt, ...) {
+	va_list args;
+
+	printf("ERROR: ");
+	va_start(args, fmt);
+	vprintf(fmt, args);
+	va_end(args);
+	putchar('\n');
 	while(true) {
 		sleep_ms(1000);
 	}

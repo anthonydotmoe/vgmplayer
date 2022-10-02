@@ -5,9 +5,9 @@
 #include "ff.h"
 #include "hw_config.h"
 #include "sd_spi.h"
-#include "pico/sem.h"
 
 #include "hardware/pio.h"
+#include "hardware/timer.h"
 #include "ym2151.pio.h"
 
 #include "lib/TinyVGM/TinyVGM.h"

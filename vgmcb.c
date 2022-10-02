@@ -88,7 +88,7 @@ int vgmcb_metadata(void *userp, TinyVGMMetadataType type, uint32_t file_offset, 
 	putchar('\n');
     
 	f_lseek(fil, cur_pos);
-
+    
 	return TinyVGM_OK;
 }
 
@@ -158,12 +158,17 @@ int vgmcb_command(void *userp, unsigned int cmd, const void *buf, uint32_t len) 
         pio_sm_put_blocking(pio, sm, pio_data);
         break;
     default:
-        printf("Unhandled command\ncmd: 0x%02x, len: %" PRIu32 ", data: ", cmd, len);
+        /*
+        printf("Unhandled command: 0x%02x, len: %" PRIu32 ", data: ", cmd, len);
         for(uint32_t i = 0; i < len; i++)
             printf("%02x ", ((uint8_t*)buf)[i]);
         putchar('\n');
+        */
         break;
     }
+    
+    if(pio_sm_is_tx_fifo_empty(pio, sm))
+            printf("TX FIFO empty!\t%d\n", time_us_32());
     
     return TinyVGM_OK;
     
