@@ -23,6 +23,10 @@ int vgmcb_header(void *userp, TinyVGMHeaderField field, uint32_t value) {
                 set_data_offset_abs(0x40);
                 printf("Pre-1.50 version detected, Data Offset is 0x40\n");
             }
+            printf("\nVGM FILE VERSION: %x.%02x\n\n", (value >> 8), (value & 0xFF));
+            break;
+        case TinyVGM_HeaderField_YM2413_Clock:
+            printf("YM2413 clock: %x\nCould be YM2151 clock...\n", value);
             break;
         case TinyVGM_HeaderField_Data_Offset:
             set_data_offset_abs(value + tinyvgm_headerfield_offset(field));
@@ -36,20 +40,18 @@ int vgmcb_header(void *userp, TinyVGMHeaderField field, uint32_t value) {
             set_loop_offset_abs(value + tinyvgm_headerfield_offset(field));
             printf("Loop Offset: 0x%08" PRIx32 " (%" PRIu32 ")\n", get_loop_offset_abs(), get_loop_offset_abs());
         case TinyVGM_HeaderField_YM2151_Clock:
+            printf("\nYM2151 clock: 0x%x\n\n", value);
             if(!value) {
                 fprintf(stderr, "Can't continue. No YM2151 in the VGM\n");
                 return TinyVGM_EINVAL;
             }
             sd_card_t *sd_card = sd_get_by_num(0);
-
-            //dma_channel_wait_for_finish_blocking(sd_card->spi->tx_dma);
-            //dma_channel_wait_for_finish_blocking(sd_card->spi->rx_dma);
             while(spi_is_busy(sd_card->spi->hw_inst));
-
             ltc_set_freq(((vgmcb_data_t*)userp)->ltc_h, value);
             //ltc_output_enable(((vgmcb_data_t*)userp)->ltc_h, true);
 
             printf("Set the YM2151 clock to %d\n", value);
+            break;
     }
     return TinyVGM_OK;
 }
