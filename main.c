@@ -13,6 +13,7 @@
 #define YM2151_DATA_BASE 0
 #define YM2151_CTRL_BASE 8
 #define YM2151_ICL_PIN   14
+#define YM2151_ICL_DELAY 100
 
 FRESULT init_sd_card();
 void __attribute((noreturn)) die(const char *fmt, ...);
@@ -36,9 +37,15 @@ int main(){
 	
 	stdio_init_all();
 	
-	sleep_ms(500);
+	sleep_ms(500); // Wait for computer to catch up
+
+	// Set up _ICL pin and silence the chips
 	gpio_init(YM2151_ICL_PIN);
 	gpio_set_dir(YM2151_ICL_PIN, GPIO_OUT);
+	gpio_put(YM2151_ICL_PIN, 1);
+	sleep_ms(YM2151_ICL_DELAY);
+	gpio_put(YM2151_ICL_PIN, 0);
+	sleep_ms(YM2151_ICL_DELAY);
 	gpio_put(YM2151_ICL_PIN, 1);
 	
 	// Set up LTC6903
@@ -105,6 +112,7 @@ int main(){
 		{
 			die("Could not open \"%s\", f_open returned %d", filinfo.fname, fr);
 		}
+		printf("Opened file: %s\n", filinfo.fname);
 
 		// Parse header, get GD3 start, Data offset, determine if file can be played
 		ret = tinyvgm_parse_header(&vgm_ctx);
@@ -130,9 +138,9 @@ int main(){
 				pio_sm_set_enabled(pio, pio_timer_program_sm, true);
 
 				gpio_put(YM2151_ICL_PIN, 0); // Initial clear with low
-				sleep_ms(1000);
+				sleep_ms(YM2151_ICL_DELAY);
 				gpio_put(YM2151_ICL_PIN, 1); // Set back to high
-				sleep_ms(1000);
+				sleep_ms(YM2151_ICL_DELAY);
 				ret = tinyvgm_parse_commands(&vgm_ctx, get_data_offset_abs());
 				/*
 				while (!ret && loop_count < 1) {
