@@ -4,3 +4,6 @@
 [submodule "lib/TinyVGM"]
 	path = lib/TinyVGM
 	url = ../TinyVGM.git
+[submodule "lib/sharpmem-rp2040"]
+	path = lib/sharpmem-rp2040
+	url = ../sharpmem-rp2040
