@@ -28,7 +28,7 @@
 .wrap_target
 start:
   pull
-  wait 1 irq 4                ; wait for 44.1kHz clock
+; wait 1 irq 4                ; wait for 44.1kHz clock
   out x, 16                   ; move opcode from osr to x register
   jmp !x send                 ; opcode 0, send data
   out x, 16                   ; move wait cycle count to x
@@ -48,6 +48,8 @@ send:
   set pins, 0b001      ; --, --, CS
   /*
   nop [30]
+  nop [31]
+  nop [31]
   nop [31]
   nop [31]
   nop [31]

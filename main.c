@@ -184,6 +184,6 @@ void __attribute((noreturn)) die(const char *fmt, ...) {
 	va_end(args);
 	putchar('\n');
 	while(true) {
-		sleep_ms(1000);
+	sleep_ms(1000);
 	}
 }
