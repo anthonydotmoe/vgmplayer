@@ -1,9 +1,9 @@
-[submodule "lib/no-OS-FatFS"]
-	path = lib/no-OS-FatFS
+[submodule "firmware/lib/TinyVGM"]
+	path = firmware/lib/TinyVGM
+	url = ../TinyVGM
+[submodule "firmware/lib/fatfs"]
+	path = firmware/lib/fatfs
 	url = ../no-OS-FatFS-SD-SPI-RPi-Pico
-[submodule "lib/TinyVGM"]
-	path = lib/TinyVGM
-	url = ../TinyVGM.git
-[submodule "lib/sharpmem-rp2040"]
-	path = lib/sharpmem-rp2040
+[submodule "firmware/lib/sharpmem-rp2040"]
+	path = firmware/lib/sharpmem-rp2040
 	url = ../sharpmem-rp2040
