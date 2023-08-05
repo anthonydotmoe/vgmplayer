@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "vgmplayer")(type "KiCad")(uri "${KIPRJMOD}/../libraries/vgmplayer.kicad_sym")(options "")(descr ""))
+)
