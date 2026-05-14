@@ -1,4 +1,5 @@
 #include "vgmcb.h"
+#include "pbcmd.h"
 
 static uint32_t data_offset_abs = 0;
 void set_data_offset_abs(const uint32_t o) {data_offset_abs = o;}
@@ -13,6 +14,7 @@ void set_gd3_offset_abs(const uint32_t o) {gd3_offset_abs = o;}
 uint32_t get_gd3_offset_abs() {return gd3_offset_abs;}
 
 int vgmcb_header(void *userp, TinyVGMHeaderField field, uint32_t value) {
+    PlaybackCmd cmd;
     switch(field) {
         case TinyVGM_HeaderField_Version:
             if(value < 0x00000110) {
@@ -36,10 +38,11 @@ int vgmcb_header(void *userp, TinyVGMHeaderField field, uint32_t value) {
             set_gd3_offset_abs(value + tinyvgm_headerfield_offset(field));
             printf("GD3 Offset: 0x%08" PRIx32 " (%" PRIu32 ")\n", get_gd3_offset_abs(), get_gd3_offset_abs());
             break;
-        case TinyVGM_HeaderField_Total_Samples:
+        case TinyVGM_HeaderField_Total_Samples: {
             uint dur_seconds = 1.0f / 44100 * value;
             printf("Duration: %02d:%02d\n", dur_seconds / 60, dur_seconds % 60);
             break;
+        }
         case TinyVGM_HeaderField_Loop_Offset:
             set_loop_offset_abs(value + tinyvgm_headerfield_offset(field));
             printf("Loop Offset: 0x%08" PRIx32 " (%" PRIu32 ")\n", get_loop_offset_abs(), get_loop_offset_abs());
@@ -51,6 +54,14 @@ int vgmcb_header(void *userp, TinyVGMHeaderField field, uint32_t value) {
             }
             sd_card_t *sd_card = sd_get_by_num(0);
             while(spi_is_busy(sd_card->spi->hw_inst));
+
+            // TODO: I'm pushing the command with the clock frequency, but the player
+            // core isn't doing the clock configuration itself. I'm putting that off
+            // until I figure out how to share the SPI bus between cores.
+            cmd.ty = CMD_Reset;
+            cmd.cmd_reset.ym_clock = value;
+            pbcmd_push(&cmd);
+
             ltc_set_freq(((vgmcb_data_t*)userp)->ltc_h, value);
             //ltc_output_enable(((vgmcb_data_t*)userp)->ltc_h, true);
 
@@ -81,7 +92,7 @@ int vgmcb_metadata(void *userp, TinyVGMMetadataType type, uint32_t file_offset, 
 	FSIZE_t cur_pos = f_tell(fil);
 	f_lseek(fil, file_offset);
 
-    printf(metadata_strings[type]);
+    printf("%s", type < 11 ? metadata_strings[type] : "Unknown type");
 
 	for (size_t i=0; i<len; i+=2) {
 		uint16_t c;
@@ -119,28 +130,29 @@ int vgmcb_datablock(void *userp, unsigned int type, uint32_t file_offset, uint32
 }
 
 int vgmcb_command(void *userp, unsigned int cmd, const void *buf, uint32_t len) {
-    PIO pio = ((vgmcb_data_t*)userp)->ym2151_data_pio;
-    uint sm = ((vgmcb_data_t*)userp)->ym2151_data_sm;
-    uint32_t pio_data;
+    PlaybackCmd pbcmd;
     
     switch(cmd) {
     case 0x54: // YM2151 data write: 54 aa dd: write value dd to register aa
-        uint8_t addr = ((uint8_t*)buf)[0];
-        uint8_t data = ((uint8_t*)buf)[1];
-        pio_data = 0u | (((uint16_t)addr) << 8) | data;
-        pio_sm_put_blocking(pio, sm, pio_data);
+        pbcmd.ty = CMD_Write;
+        pbcmd.cmd_write.addr = ((uint8_t*)buf)[0];
+        pbcmd.cmd_write.data = ((uint8_t*)buf)[1];
+        pbcmd_push(&pbcmd);
         break;
     case 0x61: // Wait n samples: 61 nn nn
-        pio_data = 0xffff0000 | *((uint16_t*)buf);
-        pio_sm_put_blocking(pio, sm, pio_data);
+        pbcmd.ty = CMD_Wait;
+        pbcmd.cmd_wait.wait = (uint32_t)(*((uint16_t*)buf));
+        pbcmd_push(&pbcmd);
         break;
     case 0x62: // Wait 735 samples (1/60 second)
-        pio_data = 0xffff0000 | 735;
-        pio_sm_put_blocking(pio, sm, pio_data);
+        pbcmd.ty = CMD_Wait;
+        pbcmd.cmd_wait.wait = 735;
+        pbcmd_push(&pbcmd);
         break;
     case 0x63: // Wait 882 samples (1/50 second)
-        pio_data = 0xffff0000 | 882;
-        pio_sm_put_blocking(pio, sm, pio_data);
+        pbcmd.ty = CMD_Wait;
+        pbcmd.cmd_wait.wait = 882;
+        pbcmd_push(&pbcmd);
         break;
     case 0x70:
     case 0x71:
@@ -158,8 +170,9 @@ int vgmcb_command(void *userp, unsigned int cmd, const void *buf, uint32_t len) 
     case 0x7d:
     case 0x7e:
     case 0x7f:
-        pio_data = 0xffff0000 | ((cmd & 0x0f) + 1);
-        pio_sm_put_blocking(pio, sm, pio_data);
+        pbcmd.ty = CMD_Wait;
+        pbcmd.cmd_wait.wait = (uint32_t)((cmd & 0x0f) + 1);
+        pbcmd_push(&pbcmd);
         break;
     default:
         /*
@@ -171,11 +184,7 @@ int vgmcb_command(void *userp, unsigned int cmd, const void *buf, uint32_t len) 
         break;
     }
     
-    if(pio_sm_is_tx_fifo_empty(pio, sm))
-            printf("TX FIFO empty!\t%d\n", time_us_32());
-    
     return TinyVGM_OK;
-    
 }
 
 // should return the number of bytes actually read, 0 for EOF, negative values for error

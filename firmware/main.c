@@ -1,12 +1,21 @@
+#include <hardware/pio.h>
+#include <pico/time.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdarg.h>
-#include "pico/stdlib.h"
+
+#include "pico/stdio.h"
+#include "pico/multicore.h"
+#include "pico/time.h"
+#include "hardware/sync.h"
+
 #include "sd_card.h"
 #include "ff.h"
 
 #include "lib/TinyVGM/TinyVGM.h"
 #include "lib/ltc6903/ltc6903.h"
 
+#include "pbcmd.h"
 #include "vgmcb.h"
 #include "ym2151.pio.h"
 
@@ -15,8 +24,9 @@
 #define YM2151_ICL_PIN   14
 #define YM2151_ICL_DELAY 100
 
-FRESULT init_sd_card();
-void __attribute((noreturn)) die(const char *fmt, ...);
+static FRESULT init_sd_card(FATFS *fs);
+static void __attribute((noreturn)) die(const char *fmt, ...);
+static void core1_main(void);
 
 typedef enum {
 	VGMPLAYER_PLAY,
@@ -24,6 +34,19 @@ typedef enum {
 	VGMPLAYER_STOP
 } VGMPLAYER_STATE;
 
+typedef struct _Core1State {
+	PIO ym2151_data_pio;
+	uint ym2151_data_sm;
+} Core1State;
+
+static Core1State core1_state;
+
+static void ym2151_reset()
+{
+	gpio_put(YM2151_ICL_PIN, 0);
+	sleep_ms(YM2151_ICL_DELAY);
+	gpio_put(YM2151_ICL_PIN, 1);
+}
 
 int main(){
 	FRESULT fr;
@@ -34,19 +57,21 @@ int main(){
 
 	int ret;
 	char buf;
+
+	// Workaround for sleep_ms hanging the debug session
+	timer_hw->dbgpause = 0;
 	
 	stdio_init_all();
-	
-	sleep_ms(500); // Wait for computer to catch up
 
-	// Set up _ICL pin and silence the chips
+	// Initialize ICL pin
 	gpio_init(YM2151_ICL_PIN);
 	gpio_set_dir(YM2151_ICL_PIN, GPIO_OUT);
 	gpio_put(YM2151_ICL_PIN, 1);
-	sleep_ms(YM2151_ICL_DELAY);
-	gpio_put(YM2151_ICL_PIN, 0);
-	sleep_ms(YM2151_ICL_DELAY);
-	gpio_put(YM2151_ICL_PIN, 1);
+
+	sleep_ms(500); // Wait for computer to catch up
+
+	// Initialize the shared queue
+	pbcmd_init();
 	
 	// Set up LTC6903
 	printf("Initializing LTC6903\n");
@@ -81,18 +106,16 @@ int main(){
 
 	// Set up PIO SMs
 	PIO pio = pio0;
-	// Initialize the timer program
-	uint pio_timer_program_offset = pio_add_program(pio, &ym2151_timer_program);
-	uint pio_timer_program_sm = pio_claim_unused_sm(pio, true);
-	init_ym2151_timer_program(pio, pio_timer_program_sm, pio_timer_program_offset);
-	// Initialize the data program
 	uint pio_data_program_offset = pio_add_program(pio, &ym2151_write_data_program);
 	uint pio_data_program_sm = pio_claim_unused_sm(pio, true);
 	init_ym2151_write_data_program(pio, pio_data_program_sm, pio_data_program_offset, 0, 8);
 
 	// Share this data with the callback
-	vgmcb_data.ym2151_data_pio = pio;
-	vgmcb_data.ym2151_data_sm = pio_data_program_sm;
+	core1_state.ym2151_data_pio = pio;
+	core1_state.ym2151_data_sm = pio_data_program_sm;
+
+	// Start up the playback core
+	multicore_launch_core1(core1_main);
 
 	// Initialize SD card
 	fr = init_sd_card(&fs);
@@ -132,24 +155,17 @@ int main(){
 			if (get_data_offset_abs())
 			{
 				uint loop_count = 0;
-				pio_sm_set_enabled(pio, pio_timer_program_sm, false);
-				pio_sm_clear_fifos(pio, pio_data_program_sm);
-				pio_sm_restart(pio, pio_data_program_sm);
-				pio_sm_set_enabled(pio, pio_timer_program_sm, true);
 
-				gpio_put(YM2151_ICL_PIN, 0); // Initial clear with low
-				sleep_ms(YM2151_ICL_DELAY);
-				gpio_put(YM2151_ICL_PIN, 1); // Set back to high
-				sleep_ms(YM2151_ICL_DELAY);
 				ret = tinyvgm_parse_commands(&vgm_ctx, get_data_offset_abs());
-				/*
-				while (!ret && loop_count < 1) {
+				
+				// Loop it forever
+				while (!ret) {
 					ret = tinyvgm_parse_commands(&vgm_ctx, get_loop_offset_abs());
-					loop_count++;
 				}
-				*/
 				printf("tinyvgm_parse_commands returned %d\n", ret);
 			}
+			//TODO: We just die here because playback would likely stop immediately
+			die("Can't handle Core 1 running on it's own...");
 			printf("Playback finished\n");
 		}
 		sleep_ms(100);
@@ -161,7 +177,7 @@ int main(){
 	die("Out of vgm files");
 }
 
-FRESULT init_sd_card(FATFS *fs) {
+static FRESULT init_sd_card(FATFS *fs) {
 	FRESULT fr;
 	if(!sd_init_driver()) {
 		return fr;
@@ -175,7 +191,7 @@ FRESULT init_sd_card(FATFS *fs) {
 	return FR_OK;
 }
 
-void __attribute((noreturn)) die(const char *fmt, ...) {
+static void __attribute((noreturn)) die(const char *fmt, ...) {
 	va_list args;
 
 	printf("ERROR: ");
@@ -186,4 +202,71 @@ void __attribute((noreturn)) die(const char *fmt, ...) {
 	while(true) {
 	sleep_ms(1000);
 	}
+}
+
+static volatile int32_t wait_accum = 0;
+
+static bool vgm_sample_timer_cb(repeating_timer_t *rt)
+{
+	wait_accum--;
+	return true;	// Keep repeating
+}
+
+static void emit_ym_write(uint8_t addr, uint8_t data);
+
+static void core1_main()
+{
+	// This function is started after Core 0 is done touching Core1State
+	
+	// TODO:
+	// This is not exactly 44.1kHz, testing only
+	static repeating_timer_t sample_timer;
+	add_repeating_timer_us(
+		-23,
+		vgm_sample_timer_cb,
+		NULL,
+		&sample_timer
+	);
+
+	PlaybackCmd cmd;
+
+	while (1)
+	{
+		pbcmd_pull(&cmd);
+		switch (cmd.ty) {
+			case CMD_Reset:
+				pio_sm_clear_fifos(
+					core1_state.ym2151_data_pio,
+					core1_state.ym2151_data_sm);
+				pio_sm_restart(
+					core1_state.ym2151_data_pio,
+					core1_state.ym2151_data_sm);
+				ym2151_reset();
+				break;
+			case CMD_Wait:
+				wait_accum += cmd.cmd_wait.wait;
+				break;
+			case CMD_Write:
+				while (wait_accum > 0) {
+					// Wait for time to pass
+				}
+
+				emit_ym_write(cmd.cmd_write.addr, cmd.cmd_write.data);
+				break;
+
+			default:
+				break;
+		}
+	}
+
+}
+
+static void emit_ym_write( uint8_t addr, uint8_t data)
+{
+	uint32_t pio_data = (((uint16_t)addr) << 8) | data;
+	PIO pio = core1_state.ym2151_data_pio;
+	pio_sm_put_blocking(
+		core1_state.ym2151_data_pio,
+		core1_state.ym2151_data_sm,
+		pio_data);
 }

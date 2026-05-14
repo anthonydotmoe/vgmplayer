@@ -9,9 +9,12 @@ pico_sdk_init()
 add_executable(${PROJECT_NAME}
 	main.c
 	vgmcb.c
+	pbcmd.c
 )
 
 pico_generate_pio_header(${PROJECT_NAME} ${CMAKE_CURRENT_LIST_DIR}/ym2151.pio)
+
+add_compile_definitions(TinyVGM_DEBUG=0)
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/lib/TinyVGM)
 add_subdirectory(${CMAKE_SOURCE_DIR}/lib/fatfs/FatFs_SPI)
@@ -24,6 +27,7 @@ pico_add_extra_outputs(${PROJECT_NAME})
 
 target_link_libraries(${PROJECT_NAME}
 	pico_stdlib
+	pico_multicore
 	hardware_pio
 	TinyVGM
 	FatFs_SPI

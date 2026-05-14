@@ -1,41 +1,19 @@
-.program ym2151_timer
-
-; Raise PIO IRQ 0 every 44.1kHz after clock division
-
-.wrap_target
-  irq wait 4
-.wrap
-
 .program ym2151_write_data
-
-/* TODO:
- This implementation was founded on the idea that sending a command takes one
- sample. See note in /notes/vgm-timing.md
-*/
 
 ; Send byte dd to address aa
 
 ; Recieves a 32-bit command in the form of:
-; cc cc dd dd, where cc cc is the op code, and dd dd are the operands. 
+; xx xx aa dd
 ;
-; Op codes
-;   If 0:
-;     operands aa dd where aa is the 8 bit address and dd is 8 bit data to send.
-;   If !0:
-;     spin for nn nn cycles, where nn nn is the 16 bits after the control value
+; xx: (don't care)
+; aa: 8-bit address
+; dd: 8-bit data
 
   set pins, 0b001 ; start with CS high
 .wrap_target
 start:
   pull
-; wait 1 irq 4                ; wait for 44.1kHz clock
   out x, 16                   ; move opcode from osr to x register
-  jmp !x send                 ; opcode 0, send data
-  out x, 16                   ; move wait cycle count to x
-wait_loop:
-  wait 1 irq 4                ; wait for next 44.1kHz clock
-  jmp x-- wait_loop           ; jump back to wait if x-- != 0
-  jmp start                   ; jump back to start if x == 0
 send:
 ;                        A0, WR, CS
   set pins, 0b000      ; --, --, --
@@ -46,7 +24,6 @@ send:
   out pins, 8     [4]  ;
   set pins, 0b101 [4]  ; A0, --, CS
   set pins, 0b001      ; --, --, CS
-  /*
   nop [30]
   nop [31]
   nop [31]
@@ -54,18 +31,10 @@ send:
   nop [31]
   nop [31]
   nop [31]
-  */
 .wrap
 
 % c-sdk {
     #include "hardware/clocks.h"
-    static inline void init_ym2151_timer_program(PIO pio, uint sm, uint offset) {
-        pio_sm_config c = ym2151_timer_program_get_default_config(offset);
-        printf("current clock speed: %d\n", clock_get_hz(clk_sys));
-        sm_config_set_clkdiv(&c, 2834.47f);
-        pio_sm_init(pio, sm, offset, &c);
-        pio_sm_set_enabled(pio, sm, true);
-    }
     
     static inline void init_ym2151_write_data_program(PIO pio, uint sm, uint offset, uint data_base, uint ctrl_base) {
         for(int i = data_base; i < data_base + 8; i++) {
