@@ -204,31 +204,16 @@ static void __attribute((noreturn)) die(const char *fmt, ...) {
 	}
 }
 
-static volatile int32_t wait_accum = 0;
-
-static bool vgm_sample_timer_cb(repeating_timer_t *rt)
-{
-	wait_accum--;
-	return true;	// Keep repeating
-}
-
 static void emit_ym_write(uint8_t addr, uint8_t data);
+static void wait_vgm_samples(int32_t *wait_accum, uint64_t *next_sample_time);
 
 static void core1_main()
 {
 	// This function is started after Core 0 is done touching Core1State
-	
-	// TODO:
-	// This is not exactly 44.1kHz, testing only
-	static repeating_timer_t sample_timer;
-	add_repeating_timer_us(
-		-23,
-		vgm_sample_timer_cb,
-		NULL,
-		&sample_timer
-	);
 
 	PlaybackCmd cmd;
+	int32_t wait_accum = 0;
+	uint64_t next_sample_time = ((uint64_t)time_us_32()) << 32;
 
 	while (1)
 	{
@@ -242,14 +227,14 @@ static void core1_main()
 					core1_state.ym2151_data_pio,
 					core1_state.ym2151_data_sm);
 				ym2151_reset();
+				wait_accum = 0;
+				next_sample_time = ((uint64_t)time_us_32()) << 32;
 				break;
 			case CMD_Wait:
 				wait_accum += cmd.cmd_wait.wait;
 				break;
 			case CMD_Write:
-				while (wait_accum > 0) {
-					// Wait for time to pass
-				}
+				wait_vgm_samples(&wait_accum, &next_sample_time);
 
 				emit_ym_write(cmd.cmd_write.addr, cmd.cmd_write.data);
 				break;
@@ -259,6 +244,28 @@ static void core1_main()
 		}
 	}
 
+}
+
+static void wait_vgm_samples(int32_t *wait_accum, uint64_t *next_sample_time)
+{
+	const uint64_t sample_period_us_q32 = (((uint64_t)1000000) << 32) / 44100;
+
+	while (*wait_accum > 0) {
+		int64_t remaining_q32 =
+			(int64_t)(*next_sample_time - (((uint64_t)time_us_32()) << 32));
+
+		if (remaining_q32 > 0) {
+			uint32_t remaining_us = (uint32_t)(remaining_q32 >> 32);
+			if (remaining_us > 1) {
+				sleep_us(remaining_us - 1);
+			}
+			tight_loop_contents();
+			continue;
+		}
+
+		(*wait_accum)--;
+		*next_sample_time += sample_period_us_q32;
+	}
 }
 
 static void emit_ym_write( uint8_t addr, uint8_t data)
