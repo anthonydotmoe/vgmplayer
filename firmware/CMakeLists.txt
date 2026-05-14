@@ -14,7 +14,10 @@ add_executable(${PROJECT_NAME}
 
 pico_generate_pio_header(${PROJECT_NAME} ${CMAKE_CURRENT_LIST_DIR}/ym2151.pio)
 
-add_compile_definitions(TinyVGM_DEBUG=0)
+add_compile_definitions(
+	TinyVGM_DEBUG=0
+	NO_PICO_LED
+	)
 
 add_subdirectory(${CMAKE_SOURCE_DIR}/lib/TinyVGM)
 add_subdirectory(${CMAKE_SOURCE_DIR}/lib/fatfs/FatFs_SPI)
