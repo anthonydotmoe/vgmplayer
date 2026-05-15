@@ -115,6 +115,7 @@ int main(){
 	core1_state.ym2151_data_sm = pio_data_program_sm;
 
 	// Start up the playback core
+	multicore_reset_core1();
 	multicore_launch_core1(core1_main);
 
 	// Initialize SD card
